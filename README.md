@@ -19,6 +19,7 @@ Built incrementally in small sprints.
 - **Sprint 4** — Introduced a proper Pose system (`src/pose/`): `AnimationAction`s now only *describe* a target `DragonPose` (position + rotation + scale, always built from a frozen `HOME_POSE`) instead of touching any transform directly. All smoothing math moved into `PoseInterpolator`, the single place interpolation logic lives. `AnimationController` no longer touches Three.js at all — it just asks the interpolator to ease toward each action's pose and hands the result to `Dragon.tsx`, which is now the only place that applies numbers to the actual model.
 - **Sprint 5** — First environment perception: `CursorTracker` (`src/input/`) just knows where the cursor is; `CursorAwareness` (`src/awareness/`) polls it every 400ms and, if the cursor lingers close to the window's center, asks `CreatureBrain` to trigger `ObserveCursorInstinct` — a brief, bounded glance toward the cursor's side, reusing the existing Pose system, that returns to Idle on its own once its duration elapses. The dragon notices the cursor; it never follows it.
 - **Sprint 6** — Bugfix: removed the dev-only `OrbitControls` entirely so the camera can never be moved, rotated, or zoomed by the user — the framing is now permanently fixed. Also added the first direct interactions: `InteractionManager` (`src/interaction/`) centralizes mouse events and figures out if they're near the dragon, without ever importing `CreatureBrain` itself; `ClickInteraction` (own cooldown) triggers a new `CelebrateInstinct` — a small friendly bounce — and `HoverInteraction` (own dwell-time + cooldown) reuses `ObserveCursorInstinct` when the cursor lingers nearby. No Drag & Drop yet.
+- **Sprint 7** — First personality pass: four new spontaneous instincts (`LookUp`, `HeadTilt`, `Stretch`, `TinyBounce`) that fire occasionally while idle, each built purely from the existing Pose system. `InstinctManager` gained two general capabilities to support them: a per-instinct `cooldown` (so the same quirk can't repeat too soon, on top of the existing "never twice in a row" rule) and an optional `rollIntensity()` hook, called each time an instinct is picked, that lets it randomize its own angle/height/intensity for that one occurrence — so no two glances or bounces feel identical.
 
 ## Prerequisites
 
@@ -58,14 +59,16 @@ src/
   dragon/
     behaviourStates.ts    Sprint 2's pure state/pose logic — unused since Sprint 3
   brain/
-    Instinct.ts             Abstract base: id, priority, probability, min/maxDuration
-    InstinctManager.ts       Weighted random selection, never repeats the last instinct
+    Instinct.ts             Abstract base: id, priority, probability, min/maxDuration, cooldown, rollIntensity()
+    InstinctManager.ts       Weighted random selection, cooldown-aware, never repeats the last instinct
     CreatureBrain.ts         Continuous think-act-wait loop + triggerInstinct() for external requests
-    instincts/                One file per instinct (Breathe, StayStill, LookLeft, LookRight, ObserveCursor, Celebrate)
+    instincts/                One file per instinct (Breathe, StayStill, LookLeft, LookRight, ObserveCursor,
+                                 Celebrate, LookUp, HeadTilt, Stretch, TinyBounce)
   animation/
     AnimationAction.ts       Abstract base — describes a target DragonPose, applies nothing
     AnimationController.ts   Listens to CreatureBrain, delegates all smoothing to PoseInterpolator
-    actions/                  One file per action (Idle, StayStill, LookLeft, LookRight, ObserveCursor, Celebrate)
+    actions/                  One file per action (Idle, StayStill, LookLeft, LookRight, ObserveCursor,
+                                 Celebrate, LookUp, HeadTilt, Stretch, TinyBounce)
   pose/
     DragonPose.ts             Position/rotation/scale structure + the frozen HOME_POSE
     PoseUtils.ts               clonePose(), createHomePose() — no Three.js/GLB dependency

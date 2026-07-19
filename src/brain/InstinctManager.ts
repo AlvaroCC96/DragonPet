@@ -2,10 +2,14 @@ import type { Instinct } from "./Instinct";
 
 /**
  * Owns the registered instincts and picks the next one to run. Weighted by
- * priority * probability, and never picks the same instinct twice in a row.
+ * priority * probability, never picks the same instinct twice in a row, and
+ * respects each instinct's own cooldown so the creature doesn't feel like a
+ * repetitive loop. Also rolls a fresh random intensity for whichever
+ * instinct it picks, if that instinct defines one.
  */
 export class InstinctManager {
   private readonly instincts: Instinct[];
+  private readonly lastActivatedAt = new Map<string, number>();
 
   constructor(instincts: Instinct[]) {
     if (instincts.length === 0) {
@@ -15,10 +19,25 @@ export class InstinctManager {
   }
 
   selectNext(previous: Instinct | null): Instinct {
-    const candidates = this.instincts.filter((instinct) => instinct.id !== previous?.id);
-    // Only happens if a single instinct is registered; repeating is unavoidable then.
-    const pool = candidates.length > 0 ? candidates : this.instincts;
-    return this.weightedRandomPick(pool);
+    const eligible = this.instincts.filter(
+      (instinct) => instinct.id !== previous?.id && !this.isOnCooldown(instinct),
+    );
+    // Falls back to ignoring cooldowns (but still avoiding an immediate repeat) if
+    // everything else is cooling down, so the creature is never stuck idle.
+    const withoutRepeat = this.instincts.filter((instinct) => instinct.id !== previous?.id);
+    const pool = eligible.length > 0 ? eligible : withoutRepeat.length > 0 ? withoutRepeat : this.instincts;
+
+    const chosen = this.weightedRandomPick(pool);
+    chosen.rollIntensity();
+    this.lastActivatedAt.set(chosen.id, Date.now());
+    return chosen;
+  }
+
+  private isOnCooldown(instinct: Instinct): boolean {
+    if (instinct.cooldown <= 0) return false;
+    const lastActivated = this.lastActivatedAt.get(instinct.id);
+    if (lastActivated === undefined) return false;
+    return Date.now() - lastActivated < instinct.cooldown * 1000;
   }
 
   private weightedRandomPick(pool: Instinct[]): Instinct {

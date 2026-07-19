@@ -1,18 +1,26 @@
 import type { AnimationAction } from "../AnimationAction";
 import { CelebrateAction } from "./CelebrateAction";
+import { HeadTiltAction } from "./HeadTiltAction";
 import { IdleAction } from "./IdleAction";
 import { LookLeftAction } from "./LookLeftAction";
 import { LookRightAction } from "./LookRightAction";
+import { LookUpAction } from "./LookUpAction";
 import { ObserveCursorAction } from "./ObserveCursorAction";
 import { StayStillAction } from "./StayStillAction";
+import { StretchAction } from "./StretchAction";
+import { TinyBounceAction } from "./TinyBounceAction";
 
 export {
   CelebrateAction,
+  HeadTiltAction,
   IdleAction,
   LookLeftAction,
   LookRightAction,
+  LookUpAction,
   ObserveCursorAction,
   StayStillAction,
+  StretchAction,
+  TinyBounceAction,
 };
 
 export const idleAction = new IdleAction();
@@ -30,4 +38,8 @@ export const defaultActions: Record<string, AnimationAction> = {
   LookRight: new LookRightAction(),
   ObserveCursor: new ObserveCursorAction(),
   Celebrate: new CelebrateAction(),
+  LookUp: new LookUpAction(),
+  HeadTilt: new HeadTiltAction(),
+  Stretch: new StretchAction(),
+  TinyBounce: new TinyBounceAction(),
 };

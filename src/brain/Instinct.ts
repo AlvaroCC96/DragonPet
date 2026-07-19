@@ -4,6 +4,9 @@ export interface InstinctOptions {
   probability: number;
   minDuration: number;
   maxDuration: number;
+  /** Minimum seconds before this instinct can be selected again after it last
+   * ran. Defaults to 0 (no extra restriction beyond never repeating immediately). */
+  cooldown?: number;
 }
 
 /**
@@ -18,6 +21,7 @@ export abstract class Instinct {
   readonly probability: number;
   readonly minDuration: number;
   readonly maxDuration: number;
+  readonly cooldown: number;
 
   protected constructor(options: InstinctOptions) {
     this.id = options.id;
@@ -25,10 +29,19 @@ export abstract class Instinct {
     this.probability = options.probability;
     this.minDuration = options.minDuration;
     this.maxDuration = options.maxDuration;
+    this.cooldown = options.cooldown ?? 0;
   }
 
   /** Called once when the brain activates this instinct. */
   abstract execute(): void;
+
+  /**
+   * Optional hook: called each time InstinctManager picks this instinct, so
+   * it can roll a fresh random intensity (angle, height, etc.) for this
+   * particular occurrence. No-op by default — override only if the
+   * instinct's matching AnimationAction needs per-activation variation.
+   */
+  rollIntensity(): void {}
 
   /** A random duration, in seconds, within this instinct's own bounds. */
   randomDuration(): number {
