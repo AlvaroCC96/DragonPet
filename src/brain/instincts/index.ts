@@ -1,15 +1,27 @@
 import type { Instinct } from "../Instinct";
 import { BreatheInstinct } from "./BreatheInstinct";
+import { CelebrateInstinct } from "./CelebrateInstinct";
 import { LookLeftInstinct } from "./LookLeftInstinct";
 import { LookRightInstinct } from "./LookRightInstinct";
 import { ObserveCursorInstinct } from "./ObserveCursorInstinct";
 import { StayStillInstinct } from "./StayStillInstinct";
 
-export { BreatheInstinct, LookLeftInstinct, LookRightInstinct, ObserveCursorInstinct, StayStillInstinct };
+export {
+  BreatheInstinct,
+  CelebrateInstinct,
+  LookLeftInstinct,
+  LookRightInstinct,
+  ObserveCursorInstinct,
+  StayStillInstinct,
+};
 
-// Shared singleton: CursorAwareness sets its `direction` and triggers it directly,
-// so it needs to be the same instance CreatureBrain and ObserveCursorAction see.
+// Shared singleton: CursorAwareness/HoverInteraction set its `direction` and
+// trigger it directly, so it needs to be the same instance CreatureBrain and
+// ObserveCursorAction see.
 export const observeCursorInstinct = new ObserveCursorInstinct();
+
+// Shared singleton: ClickInteraction triggers it directly.
+export const celebrateInstinct = new CelebrateInstinct();
 
 /**
  * The creature's default repertoire. To add a new instinct: create its class
@@ -22,4 +34,5 @@ export const defaultInstincts: Instinct[] = [
   new LookLeftInstinct(),
   new LookRightInstinct(),
   observeCursorInstinct,
+  celebrateInstinct,
 ];

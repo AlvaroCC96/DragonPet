@@ -18,6 +18,7 @@ Built incrementally in small sprints.
 - **Sprint 3** — The brain is wired up for the first time: `AnimationController` (`src/animation/`) subscribes to `CreatureBrain`, maps each Instinct to an `AnimationAction` (Idle breathing, LookLeft/LookRight turns, StayStill), and eases the model toward each action's pose every frame. `Dragon.tsx` is the thin component that connects brain + controller + model and contains no behavior logic itself.
 - **Sprint 4** — Introduced a proper Pose system (`src/pose/`): `AnimationAction`s now only *describe* a target `DragonPose` (position + rotation + scale, always built from a frozen `HOME_POSE`) instead of touching any transform directly. All smoothing math moved into `PoseInterpolator`, the single place interpolation logic lives. `AnimationController` no longer touches Three.js at all — it just asks the interpolator to ease toward each action's pose and hands the result to `Dragon.tsx`, which is now the only place that applies numbers to the actual model.
 - **Sprint 5** — First environment perception: `CursorTracker` (`src/input/`) just knows where the cursor is; `CursorAwareness` (`src/awareness/`) polls it every 400ms and, if the cursor lingers close to the window's center, asks `CreatureBrain` to trigger `ObserveCursorInstinct` — a brief, bounded glance toward the cursor's side, reusing the existing Pose system, that returns to Idle on its own once its duration elapses. The dragon notices the cursor; it never follows it.
+- **Sprint 6** — Bugfix: removed the dev-only `OrbitControls` entirely so the camera can never be moved, rotated, or zoomed by the user — the framing is now permanently fixed. Also added the first direct interactions: `InteractionManager` (`src/interaction/`) centralizes mouse events and figures out if they're near the dragon, without ever importing `CreatureBrain` itself; `ClickInteraction` (own cooldown) triggers a new `CelebrateInstinct` — a small friendly bounce — and `HoverInteraction` (own dwell-time + cooldown) reuses `ObserveCursorInstinct` when the cursor lingers nearby. No Drag & Drop yet.
 
 ## Prerequisites
 
@@ -49,8 +50,8 @@ Press **Escape** to close the window during development.
 ```
 src/
   components/
-    Scene.tsx            Canvas setup: camera, lights, controls; mounts <Dragon />
-    Dragon.tsx             Connects CreatureBrain + AnimationController + DragonModel
+    Scene.tsx            Canvas setup: fixed camera, lights; mounts <Dragon /> (no orbit controls)
+    Dragon.tsx             Connects CreatureBrain + AnimationController + perception/interaction + DragonModel
     DragonModel.tsx        Loads and centers the GLB
     DragonBehaviour.tsx    Sprint 2's state machine — unused since Sprint 3, kept for reference
     ModelErrorBoundary.tsx  Visible fallback if the GLB fails to load
@@ -60,11 +61,11 @@ src/
     Instinct.ts             Abstract base: id, priority, probability, min/maxDuration
     InstinctManager.ts       Weighted random selection, never repeats the last instinct
     CreatureBrain.ts         Continuous think-act-wait loop + triggerInstinct() for external requests
-    instincts/                One file per instinct (Breathe, StayStill, LookLeft, LookRight, ObserveCursor)
+    instincts/                One file per instinct (Breathe, StayStill, LookLeft, LookRight, ObserveCursor, Celebrate)
   animation/
     AnimationAction.ts       Abstract base — describes a target DragonPose, applies nothing
     AnimationController.ts   Listens to CreatureBrain, delegates all smoothing to PoseInterpolator
-    actions/                  One file per action (Idle, StayStill, LookLeft, LookRight, ObserveCursor)
+    actions/                  One file per action (Idle, StayStill, LookLeft, LookRight, ObserveCursor, Celebrate)
   pose/
     DragonPose.ts             Position/rotation/scale structure + the frozen HOME_POSE
     PoseUtils.ts               clonePose(), createHomePose() — no Three.js/GLB dependency
@@ -73,6 +74,10 @@ src/
     CursorTracker.ts           pointermove/pointerleave on window; only knows the cursor's position
   awareness/
     CursorAwareness.ts         Polls the tracker, decides "is it close?", triggers ObserveCursorInstinct
+  interaction/
+    InteractionManager.ts      Reads clicks + hover proximity; never imports CreatureBrain itself
+    ClickInteraction.ts         Own cooldown; triggers CelebrateInstinct
+    HoverInteraction.ts         Own dwell-time + cooldown; triggers ObserveCursorInstinct
 public/
   models/red-dragon.glb   The dragon asset
 src-tauri/

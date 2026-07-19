@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import { PerspectiveCamera } from "@react-three/drei";
 import Dragon from "./Dragon";
 import ModelErrorBoundary from "./ModelErrorBoundary";
 
@@ -19,9 +19,6 @@ function Scene() {
           <Dragon />
         </ModelErrorBoundary>
       </Suspense>
-
-      {/* Dev-only: lets us inspect the model while building the scene. */}
-      <OrbitControls enablePan={false} enableZoom={true} />
     </Canvas>
   );
 }
