@@ -14,6 +14,7 @@ Built incrementally in small sprints.
 
 - **Sprint 1** — Transparent, borderless, always-on-top 420×420 window. Loads and centers the dragon GLB, basic lighting, dev-only OrbitControls, Escape to quit.
 - **Sprint 2** — The dragon feels alive without any GLB animations, physics, or AI: a small state machine (`Idle`, `LookingLeft`, `LookingRight`, `Thinking`, `Stretch`) drives subtle breathing, sway, head turns, and tilts, all interpolated smoothly every frame via `useFrame`.
+- **Sprint 2.5** — The creature's "brain": a standalone, Three.js-agnostic decision system (`src/brain/`) that continuously picks natural instincts (Breathe, StayStill, LookLeft, LookRight) using weighted random selection, never repeating the same one twice in a row. Not wired into the render tree yet — this sprint is architecture only, ready for a future `AnimationController` to subscribe to it.
 
 ## Prerequisites
 
@@ -51,6 +52,11 @@ src/
     ModelErrorBoundary.tsx  Visible fallback if the GLB fails to load
   dragon/
     behaviourStates.ts    Pure state/pose logic, framework-agnostic
+  brain/
+    Instinct.ts            Abstract base: id, priority, probability, min/maxDuration
+    InstinctManager.ts      Weighted random selection, never repeats the last instinct
+    CreatureBrain.ts        Continuous think-act-wait loop (setTimeout, no useFrame)
+    instincts/               One file per instinct (Breathe, StayStill, LookLeft, LookRight)
 public/
   models/red-dragon.glb   The dragon asset
 src-tauri/
