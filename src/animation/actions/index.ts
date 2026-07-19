@@ -1,5 +1,8 @@
 import type { AnimationAction } from "../AnimationAction";
 import { CelebrateAction } from "./CelebrateAction";
+// DragAction is not registered here — it's never selected by instinct id, only
+// activated directly via AnimationController.setOverrideAction() by DragController.
+import { DropSequenceAction } from "./DropSequenceAction";
 import { HeadTiltAction } from "./HeadTiltAction";
 import { IdleAction } from "./IdleAction";
 import { LookLeftAction } from "./LookLeftAction";
@@ -12,6 +15,7 @@ import { TinyBounceAction } from "./TinyBounceAction";
 
 export {
   CelebrateAction,
+  DropSequenceAction,
   HeadTiltAction,
   IdleAction,
   LookLeftAction,
@@ -42,4 +46,5 @@ export const defaultActions: Record<string, AnimationAction> = {
   HeadTilt: new HeadTiltAction(),
   Stretch: new StretchAction(),
   TinyBounce: new TinyBounceAction(),
+  DropSequence: new DropSequenceAction(),
 };

@@ -21,6 +21,8 @@ Built incrementally in small sprints.
 - **Sprint 6** — Bugfix: removed the dev-only `OrbitControls` entirely so the camera can never be moved, rotated, or zoomed by the user — the framing is now permanently fixed. Also added the first direct interactions: `InteractionManager` (`src/interaction/`) centralizes mouse events and figures out if they're near the dragon, without ever importing `CreatureBrain` itself; `ClickInteraction` (own cooldown) triggers a new `CelebrateInstinct` — a small friendly bounce — and `HoverInteraction` (own dwell-time + cooldown) reuses `ObserveCursorInstinct` when the cursor lingers nearby. No Drag & Drop yet.
 - **Sprint 7** — First personality pass: four new spontaneous instincts (`LookUp`, `HeadTilt`, `Stretch`, `TinyBounce`) that fire occasionally while idle, each built purely from the existing Pose system. `InstinctManager` gained two general capabilities to support them: a per-instinct `cooldown` (so the same quirk can't repeat too soon, on top of the existing "never twice in a row" rule) and an optional `rollIntensity()` hook, called each time an instinct is picked, that lets it randomize its own angle/height/intensity for that one occurrence — so no two glances or bounces feel identical.
 
+- **Sprint 8** — First Drag & Drop: `DragController` (`src/interaction/`) detects a press-hold-move gesture on the dragon and, while held, writes the live target position to `DragonInteractionState` (a new enum + observable store, independent of `CreatureBrain`) and hands rendering to `AnimationController` via a new `setOverrideAction()` — bypassing the instinct system entirely, since a drag's duration is however long the user holds it. `CreatureBrain` gained `pause()`/`resume()` so it stops picking new instincts while held without losing its place. On release, the override clears and a `DropSequenceInstinct` plays a small fall/bounce/settle/glance-at-the-user sequence through the normal `triggerInstinct()` path, then Idle resumes on its own. Soft position limits keep the dragon from ever leaving the window; no physics engine involved.
+
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) 18+
@@ -61,14 +63,15 @@ src/
   brain/
     Instinct.ts             Abstract base: id, priority, probability, min/maxDuration, cooldown, rollIntensity()
     InstinctManager.ts       Weighted random selection, cooldown-aware, never repeats the last instinct
-    CreatureBrain.ts         Continuous think-act-wait loop + triggerInstinct() for external requests
+    CreatureBrain.ts         Continuous think-act-wait loop + triggerInstinct() + pause()/resume()
     instincts/                One file per instinct (Breathe, StayStill, LookLeft, LookRight, ObserveCursor,
-                                 Celebrate, LookUp, HeadTilt, Stretch, TinyBounce)
+                                 Celebrate, LookUp, HeadTilt, Stretch, TinyBounce, DropSequence)
   animation/
     AnimationAction.ts       Abstract base — describes a target DragonPose, applies nothing
-    AnimationController.ts   Listens to CreatureBrain, delegates all smoothing to PoseInterpolator
+    AnimationController.ts   Listens to CreatureBrain, delegates all smoothing to PoseInterpolator,
+                                setOverrideAction() for brain-independent rendering (e.g. dragging)
     actions/                  One file per action (Idle, StayStill, LookLeft, LookRight, ObserveCursor,
-                                 Celebrate, LookUp, HeadTilt, Stretch, TinyBounce)
+                                 Celebrate, LookUp, HeadTilt, Stretch, TinyBounce, Drag, DropSequence)
   pose/
     DragonPose.ts             Position/rotation/scale structure + the frozen HOME_POSE
     PoseUtils.ts               clonePose(), createHomePose() — no Three.js/GLB dependency
@@ -81,6 +84,9 @@ src/
     InteractionManager.ts      Reads clicks + hover proximity; never imports CreatureBrain itself
     ClickInteraction.ts         Own cooldown; triggers CelebrateInstinct
     HoverInteraction.ts         Own dwell-time + cooldown; triggers ObserveCursorInstinct
+    DragController.ts           Press-hold-move-release gesture; pauses the brain, drives the drag
+                                    override, triggers DropSequenceInstinct on release
+    DragonInteractionState.ts   Idle/Hover/BeingHeld enum + observable store + live drag position
 public/
   models/red-dragon.glb   The dragon asset
 src-tauri/

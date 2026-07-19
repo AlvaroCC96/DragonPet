@@ -17,6 +17,7 @@ export class CreatureBrain {
   private currentInstinct: Instinct | null = null;
   private timeoutId: ReturnType<typeof setTimeout> | null = null;
   private running = false;
+  private paused = false;
 
   constructor(instincts: Instinct[] = defaultInstincts) {
     this.manager = new InstinctManager(instincts);
@@ -26,6 +27,7 @@ export class CreatureBrain {
   start(): void {
     if (this.running) return;
     this.running = true;
+    this.paused = false;
     this.tick();
   }
 
@@ -64,8 +66,28 @@ export class CreatureBrain {
     this.activate(instinct);
   }
 
+  /**
+   * Stops picking new instincts. Whatever is currently running keeps going
+   * to its own natural end — this only stops the *next* pick from happening,
+   * so a physical interaction (e.g. being picked up) can take over rendering
+   * without the brain fighting it in the background.
+   */
+  pause(): void {
+    this.paused = true;
+  }
+
+  /** Resumes normal autonomous instinct selection after `pause()`. */
+  resume(): void {
+    if (!this.paused) return;
+    this.paused = false;
+    if (this.running && this.timeoutId === null) {
+      this.tick();
+    }
+  }
+
   private tick(): void {
-    if (!this.running) return;
+    this.timeoutId = null;
+    if (!this.running || this.paused) return;
     this.activate(this.manager.selectNext(this.currentInstinct));
   }
 

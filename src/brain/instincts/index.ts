@@ -1,6 +1,7 @@
 import type { Instinct } from "../Instinct";
 import { BreatheInstinct } from "./BreatheInstinct";
 import { CelebrateInstinct } from "./CelebrateInstinct";
+import { DropSequenceInstinct } from "./DropSequenceInstinct";
 import { HeadTiltInstinct } from "./HeadTiltInstinct";
 import { LookLeftInstinct } from "./LookLeftInstinct";
 import { LookRightInstinct } from "./LookRightInstinct";
@@ -13,6 +14,7 @@ import { TinyBounceInstinct } from "./TinyBounceInstinct";
 export {
   BreatheInstinct,
   CelebrateInstinct,
+  DropSequenceInstinct,
   HeadTiltInstinct,
   LookLeftInstinct,
   LookRightInstinct,
@@ -38,6 +40,9 @@ export const headTiltInstinct = new HeadTiltInstinct();
 export const stretchInstinct = new StretchInstinct();
 export const tinyBounceInstinct = new TinyBounceInstinct();
 
+// Shared singleton: DragController triggers it directly when a drag ends.
+export const dropSequenceInstinct = new DropSequenceInstinct();
+
 /**
  * The creature's default repertoire. To add a new instinct: create its class
  * in this folder, then add one entry here — CreatureBrain and InstinctManager
@@ -54,4 +59,5 @@ export const defaultInstincts: Instinct[] = [
   headTiltInstinct,
   stretchInstinct,
   tinyBounceInstinct,
+  dropSequenceInstinct,
 ];

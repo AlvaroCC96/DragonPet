@@ -6,6 +6,7 @@ import { AnimationController } from "../animation/AnimationController";
 import { CursorTracker } from "../input/CursorTracker";
 import { CursorAwareness } from "../awareness/CursorAwareness";
 import { ClickInteraction } from "../interaction/ClickInteraction";
+import { DragController } from "../interaction/DragController";
 import { HoverInteraction } from "../interaction/HoverInteraction";
 import { InteractionManager } from "../interaction/InteractionManager";
 import DragonModel from "./DragonModel";
@@ -34,14 +35,18 @@ function Dragon() {
     const hover = new HoverInteraction(brain);
     const interactions = new InteractionManager(tracker, click, hover);
 
+    const drag = new DragController(brain, controller);
+
     brain.start();
     tracker.start();
     awareness.start();
     interactions.start();
+    drag.start();
 
     controllerRef.current = controller;
 
     return () => {
+      drag.stop();
       interactions.stop();
       awareness.stop();
       tracker.stop();

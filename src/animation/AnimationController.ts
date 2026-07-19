@@ -19,6 +19,7 @@ export class AnimationController {
   private actionStartedAt = 0;
   private pendingInstinct: Instinct | null = null;
   private unsubscribe: (() => void) | null = null;
+  private overrideAction: AnimationAction | null = null;
 
   constructor(
     actions: Record<string, AnimationAction> = defaultActions,
@@ -44,15 +45,28 @@ export class AnimationController {
     this.unsubscribe = null;
   }
 
-  /** Advances the current action and the interpolator by one frame. Returns the resulting Pose. */
+  /**
+   * Forces a specific action to render regardless of the brain's current
+   * instinct — used for physical interactions (e.g. being dragged) that
+   * aren't decided by the brain at all. Pass null to let brain-driven
+   * instincts take over rendering again. This is still the only path
+   * anything visual takes: callers never touch the PoseInterpolator or the
+   * model directly, only this method.
+   */
+  setOverrideAction(action: AnimationAction | null): void {
+    this.overrideAction = action;
+  }
+
+  /** Advances the active action and the interpolator by one frame. Returns the resulting Pose. */
   update(elapsedTime: number, deltaTime: number): DragonPose {
     if (this.pendingInstinct) {
       this.applyInstinct(this.pendingInstinct, elapsedTime);
       this.pendingInstinct = null;
     }
 
+    const activeAction = this.overrideAction ?? this.currentAction;
     const actionElapsed = elapsedTime - this.actionStartedAt;
-    const targetPose = this.currentAction.getTargetPose(elapsedTime, actionElapsed);
+    const targetPose = activeAction.getTargetPose(elapsedTime, actionElapsed);
     this.interpolator.setTarget(targetPose);
 
     return this.interpolator.step(deltaTime);
