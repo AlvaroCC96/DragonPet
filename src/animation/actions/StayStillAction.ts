@@ -1,10 +1,12 @@
-import { AnimationAction, createNeutralPose, type AnimationTargetPose } from "../AnimationAction";
+import { AnimationAction } from "../AnimationAction";
+import type { DragonPose } from "../../pose/DragonPose";
+import { createHomePose } from "../../pose/PoseUtils";
 
-/** Freezes the small idle movements — the controller eases smoothly into stillness. */
+/** Completely neutral pose — the Home Pose itself, with no extra motion. */
 export class StayStillAction extends AnimationAction {
   readonly id = "StayStill";
 
-  getTargetPose(): AnimationTargetPose {
-    return createNeutralPose();
+  getTargetPose(): DragonPose {
+    return createHomePose();
   }
 }

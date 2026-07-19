@@ -16,6 +16,7 @@ Built incrementally in small sprints.
 - **Sprint 2** — The dragon feels alive without any GLB animations, physics, or AI: a small state machine (`Idle`, `LookingLeft`, `LookingRight`, `Thinking`, `Stretch`) drives subtle breathing, sway, head turns, and tilts, all interpolated smoothly every frame via `useFrame`.
 - **Sprint 2.5** — The creature's "brain": a standalone, Three.js-agnostic decision system (`src/brain/`) that continuously picks natural instincts (Breathe, StayStill, LookLeft, LookRight) using weighted random selection, never repeating the same one twice in a row. Not wired into the render tree yet — this sprint is architecture only, ready for a future `AnimationController` to subscribe to it.
 - **Sprint 3** — The brain is wired up for the first time: `AnimationController` (`src/animation/`) subscribes to `CreatureBrain`, maps each Instinct to an `AnimationAction` (Idle breathing, LookLeft/LookRight turns, StayStill), and eases the model toward each action's pose every frame. `Dragon.tsx` is the thin component that connects brain + controller + model and contains no behavior logic itself.
+- **Sprint 4** — Introduced a proper Pose system (`src/pose/`): `AnimationAction`s now only *describe* a target `DragonPose` (position + rotation + scale, always built from a frozen `HOME_POSE`) instead of touching any transform directly. All smoothing math moved into `PoseInterpolator`, the single place interpolation logic lives. `AnimationController` no longer touches Three.js at all — it just asks the interpolator to ease toward each action's pose and hands the result to `Dragon.tsx`, which is now the only place that applies numbers to the actual model.
 
 ## Prerequisites
 
@@ -60,9 +61,13 @@ src/
     CreatureBrain.ts         Continuous think-act-wait loop (setTimeout, no useFrame)
     instincts/                One file per instinct (Breathe, StayStill, LookLeft, LookRight)
   animation/
-    AnimationAction.ts       Abstract base + AnimatableTarget (no Three.js import needed)
-    AnimationController.ts   Listens to CreatureBrain, eases the model toward each action's pose
+    AnimationAction.ts       Abstract base — describes a target DragonPose, applies nothing
+    AnimationController.ts   Listens to CreatureBrain, delegates all smoothing to PoseInterpolator
     actions/                  One file per action (Idle, StayStill, LookLeft, LookRight)
+  pose/
+    DragonPose.ts             Position/rotation/scale structure + the frozen HOME_POSE
+    PoseUtils.ts               clonePose(), createHomePose() — no Three.js/GLB dependency
+    PoseInterpolator.ts        Current + target Pose, damps toward it each frame (all smoothing lives here)
 public/
   models/red-dragon.glb   The dragon asset
 src-tauri/

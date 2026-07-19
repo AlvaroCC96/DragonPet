@@ -1,28 +1,12 @@
-export interface AnimationTargetPose {
-  position: { x: number; y: number; z: number };
-  rotation: { x: number; y: number; z: number };
-}
-
-/** Anything with a mutable position/rotation the controller can ease toward.
- * A THREE.Group satisfies this structurally — this file never imports "three". */
-export interface AnimatableTarget {
-  position: { x: number; y: number; z: number };
-  rotation: { x: number; y: number; z: number };
-}
-
-export function createNeutralPose(): AnimationTargetPose {
-  return {
-    position: { x: 0, y: 0, z: 0 },
-    rotation: { x: 0, y: 0, z: 0 },
-  };
-}
+import type { DragonPose } from "../pose/DragonPose";
 
 /**
  * A translatable unit of visible behavior. Given how long it has been
- * active, returns the pose the model should ease toward. Knows nothing
- * about React, the CreatureBrain, or any specific 3D library.
+ * active, describes the Pose the dragon should ease toward — it never
+ * applies that pose itself. Knows nothing about React, the CreatureBrain,
+ * or any specific 3D library; the PoseInterpolator owns all the smoothing.
  */
 export abstract class AnimationAction {
   abstract readonly id: string;
-  abstract getTargetPose(elapsedTime: number, actionElapsed: number): AnimationTargetPose;
+  abstract getTargetPose(elapsedTime: number, actionElapsed: number): DragonPose;
 }

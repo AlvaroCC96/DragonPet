@@ -7,20 +7,18 @@ import DragonModel from "./DragonModel";
 
 /**
  * Wires the CreatureBrain's decisions to visible motion: creates the brain
- * and an AnimationController targeting this group, connects them, and
- * drives the per-frame update. No behavior logic lives here — that's the
- * brain's (what to do) and the controller/actions' (how it looks) job.
+ * and an AnimationController, connects them, and applies the Pose the
+ * controller computes each frame to this group. No behavior logic lives
+ * here — that's the brain's (what to do), the actions' (what pose that
+ * looks like), and the PoseInterpolator's (how smoothly to get there) job.
  */
 function Dragon() {
   const rootRef = useRef<Group>(null);
   const controllerRef = useRef<AnimationController | null>(null);
 
   useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-
     const brain = new CreatureBrain();
-    const controller = new AnimationController(root);
+    const controller = new AnimationController();
     controller.bindBrain(brain);
     brain.start();
 
@@ -34,7 +32,14 @@ function Dragon() {
   }, []);
 
   useFrame((state, delta) => {
-    controllerRef.current?.update(state.clock.elapsedTime, delta);
+    const controller = controllerRef.current;
+    const root = rootRef.current;
+    if (!controller || !root) return;
+
+    const pose = controller.update(state.clock.elapsedTime, delta);
+    root.position.set(pose.position.x, pose.position.y, pose.position.z);
+    root.rotation.set(pose.rotation.x, pose.rotation.y, pose.rotation.z);
+    root.scale.set(pose.scale.x, pose.scale.y, pose.scale.z);
   });
 
   return (

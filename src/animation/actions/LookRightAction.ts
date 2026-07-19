@@ -1,18 +1,20 @@
-import { AnimationAction, createNeutralPose, type AnimationTargetPose } from "../AnimationAction";
+import { AnimationAction } from "../AnimationAction";
+import type { DragonPose } from "../../pose/DragonPose";
+import { createHomePose } from "../../pose/PoseUtils";
 
 const TURN_DURATION = 2.5;
 const LOOK_ANGLE = 0.12;
 
-/** Slowly turns the head/model to the right, then eases back to center. */
+/** Slightly turned pose to the right; eases back to the Home Pose by TURN_DURATION. */
 export class LookRightAction extends AnimationAction {
   readonly id = "LookRight";
 
-  getTargetPose(_elapsedTime: number, actionElapsed: number): AnimationTargetPose {
+  getTargetPose(_elapsedTime: number, actionElapsed: number): DragonPose {
     const t = Math.min(actionElapsed / TURN_DURATION, 1);
     // Eases in, peaks at the midpoint, eases back to center by the end.
     const amount = Math.sin(t * Math.PI);
 
-    const pose = createNeutralPose();
+    const pose = createHomePose();
     pose.rotation.y = LOOK_ANGLE * amount;
     return pose;
   }
