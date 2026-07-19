@@ -3,11 +3,13 @@ import { useFrame } from "@react-three/fiber";
 import type { Group } from "three";
 import { CreatureBrain } from "../brain/CreatureBrain";
 import { AnimationController } from "../animation/AnimationController";
+import { CursorTracker } from "../input/CursorTracker";
+import { CursorAwareness } from "../awareness/CursorAwareness";
 import DragonModel from "./DragonModel";
 
 /**
- * Wires the CreatureBrain's decisions to visible motion: creates the brain
- * and an AnimationController, connects them, and applies the Pose the
+ * Wires the CreatureBrain's decisions to visible motion, plus the cursor
+ * perception loop that can nudge the brain to react. Applies the Pose the
  * controller computes each frame to this group. No behavior logic lives
  * here — that's the brain's (what to do), the actions' (what pose that
  * looks like), and the PoseInterpolator's (how smoothly to get there) job.
@@ -20,11 +22,19 @@ function Dragon() {
     const brain = new CreatureBrain();
     const controller = new AnimationController();
     controller.bindBrain(brain);
+
+    const tracker = new CursorTracker();
+    const awareness = new CursorAwareness(tracker, brain);
+
     brain.start();
+    tracker.start();
+    awareness.start();
 
     controllerRef.current = controller;
 
     return () => {
+      awareness.stop();
+      tracker.stop();
       brain.stop();
       controller.dispose();
       controllerRef.current = null;

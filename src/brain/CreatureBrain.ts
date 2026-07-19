@@ -48,15 +48,33 @@ export class CreatureBrain {
     return () => this.listeners.delete(listener);
   }
 
+  /**
+   * Immediately activates the given instinct, interrupting whatever is
+   * currently running. Normal autonomous selection resumes on its own once
+   * it finishes — no separate "resume" step needed. Lets external perception
+   * systems (e.g. CursorAwareness) make the creature react without the brain
+   * knowing anything about them.
+   */
+  triggerInstinct(instinct: Instinct): void {
+    if (!this.running) return;
+    if (this.timeoutId !== null) {
+      clearTimeout(this.timeoutId);
+      this.timeoutId = null;
+    }
+    this.activate(instinct);
+  }
+
   private tick(): void {
     if (!this.running) return;
+    this.activate(this.manager.selectNext(this.currentInstinct));
+  }
 
-    const next = this.manager.selectNext(this.currentInstinct);
-    this.currentInstinct = next;
-    next.execute();
-    this.listeners.forEach((listener) => listener(next));
+  private activate(instinct: Instinct): void {
+    this.currentInstinct = instinct;
+    instinct.execute();
+    this.listeners.forEach((listener) => listener(instinct));
 
-    const waitMs = next.randomDuration() * 1000;
+    const waitMs = instinct.randomDuration() * 1000;
     this.timeoutId = setTimeout(() => this.tick(), waitMs);
   }
 }

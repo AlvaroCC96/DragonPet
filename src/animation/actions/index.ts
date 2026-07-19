@@ -2,9 +2,10 @@ import type { AnimationAction } from "../AnimationAction";
 import { IdleAction } from "./IdleAction";
 import { LookLeftAction } from "./LookLeftAction";
 import { LookRightAction } from "./LookRightAction";
+import { ObserveCursorAction } from "./ObserveCursorAction";
 import { StayStillAction } from "./StayStillAction";
 
-export { IdleAction, LookLeftAction, LookRightAction, StayStillAction };
+export { IdleAction, LookLeftAction, LookRightAction, ObserveCursorAction, StayStillAction };
 
 export const idleAction = new IdleAction();
 
@@ -19,4 +20,5 @@ export const defaultActions: Record<string, AnimationAction> = {
   StayStill: new StayStillAction(),
   LookLeft: new LookLeftAction(),
   LookRight: new LookRightAction(),
+  ObserveCursor: new ObserveCursorAction(),
 };
