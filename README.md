@@ -25,6 +25,7 @@ Built incrementally in small sprints.
 - **Sprint 8.6** — Architecture pivot: instead of a large window with the model moving inside it, the *window itself* is now sized to the dragon (`DesktopWindowManager`, the only class allowed to talk to Tauri's window API) and placed at a configurable screen corner (`HomePositionManager`, now async and window-position-based instead of a 3D offset). `DragController` moves the whole OS window to follow drags (eased via `requestAnimationFrame`), not the model. Every tunable — scale, window padding, home corner, drag feel, bounce/return timing, idle breathing — now lives in `DragonConfig` (`src/config/`). Sets up cleanly for future click-through, walking, and multi-monitor support.
 - **Sprint 9** — First autonomous movement: `NavigationController` (`src/navigation/`) turns an abstract `MovementRequest` — a normalized destination, speed, easing, whether to face the travel direction — into an eased window animation via `DesktopWindowManager`, resolving via `HomePositionManager.resolveScreenPosition()`, and reports completion. `ExploreNearbyInstinct` uses it to wander to a random point near home, linger, and walk back — the brain only ever expresses *where* in normalized terms, never a window pixel. `NavigationController` is the only class allowed to move the window on its own initiative; `DragController` still moves it in direct response to the user — the two share `DesktopWindowManager` but never know about each other.
 - **Sprint 10** — The dragon's first biological system: `CreatureState` (`src/state/`) holds five `Need`s (Energy, Sleepiness, Curiosity, Playfulness, Trust) — real domain objects with bounds and drift rates, not bare numbers — and `CreatureStateManager` is the only thing that ever mutates them, ticking once a second (Curiosity rises while idle, Playfulness rises until a `Celebrate` interaction relieves it, Trust only rises on that same positive interaction). `Instinct.priority` became a method, `priority(state)`, so `ExploreNearbyInstinct` and `TinyBounceInstinct` now scale their odds with Curiosity/Playfulness — `CreatureBrain` only ever reads `CreatureState`, never mutates it. Debug visibility for now is a `console.table` of live Need values, gated by `DragonConfig.debugNeedsLogging`.
+- **Sprint 11** — Decoupled "what I want" from "how I do it": `CreatureBrain.tick()` now asks `GoalEvaluator` (`src/goals/`) to pick a `Goal` (Idle/Explore/Sleep/Play/Observe) from a `GoalContext` snapshot (CreatureState + NavigationState + DragonInteractionState + time since last interaction) *before* picking an Instinct — the evaluator only ever reads that context, never touches Three.js, a window, or executes anything. `InstinctManager.selectNext()` now filters to whichever Instincts declare `supportsGoal(goal.type)` (falling back to the full repertoire if none yet do) before applying the existing priority/cooldown system within that pool. All 10 pre-existing instincts default to supporting only `Idle`, so behavior is unchanged there; `ExploreNearbyInstinct`→Explore and `TinyBounceInstinct`→Play got explicit mappings, and `ObserveCursorInstinct`/`StayStillInstinct` stand in for Observe/Sleep until dedicated instincts exist. Logs `[Goal] Type -> Instinct` plus a Need summary every time the Goal changes, gated by `DragonConfig.debugGoalLogging`.
 
 ## Prerequisites
 
@@ -82,12 +83,21 @@ src/
     CreatureStateManager.ts     Only class allowed to mutate Needs; ticks every second, logs debug table
   dragon/
     behaviourStates.ts    Sprint 2's pure state/pose logic — unused since Sprint 3
+  goals/
+    GoalType.ts               Idle/Explore/Sleep/Play/Observe
+    Goal.ts                    Domain object: { type: GoalType } — an intention, never an animation/nav step
+    GoalContext.ts             Snapshot GoalEvaluator is handed: state/nav/interaction + time since interaction
+    GoalEvaluator.ts           Only class that decides the current Goal; reads only its GoalContext,
+                                  never executes anything
   brain/
     Instinct.ts              Abstract base: id, probability, min/maxDuration, cooldown, rollIntensity(),
-                                priority(state) — defaults to a constant, override to react to CreatureState
-    InstinctManager.ts        Weighted by priority(state) * probability, cooldown-aware, never repeats
-    CreatureBrain.ts          Continuous think-act-wait loop + triggerInstinct() + pause()/resume();
-                                 only ever reads CreatureState, never mutates it
+                                priority(state) and supportsGoal(goalType) — both default to constants/Idle,
+                                override either to react to CreatureState/Goals
+    InstinctManager.ts        Filters by supportsGoal(goal), then weighs by priority(state) * probability
+                                 within that pool, cooldown-aware, never repeats
+    CreatureBrain.ts          tick(): evaluate Goal -> select Instinct for it -> activate. Continuous
+                                 think-act-wait loop + triggerInstinct() + pause()/resume(); only ever
+                                 reads CreatureState/NavigationState/DragonInteractionState, never mutates them
     instincts/                One file per instinct (Breathe, StayStill, LookLeft, LookRight, ObserveCursor,
                                  Celebrate, LookUp, HeadTilt, Stretch, TinyBounce, DropSequence, ExploreNearby)
   animation/

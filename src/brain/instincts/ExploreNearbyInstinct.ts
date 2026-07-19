@@ -1,4 +1,5 @@
 import { DragonConfig } from "../../config/DragonConfig";
+import { GoalType } from "../../goals/GoalType";
 import { easeInOutQuad } from "../../navigation/MovementRequest";
 import { navigationController } from "../../navigation/NavigationController";
 import type { CreatureState } from "../../state/CreatureState";
@@ -53,6 +54,10 @@ export class ExploreNearbyInstinct extends Instinct {
   priority(state: CreatureState): number {
     const curiosity = state.getNormalizedNeedValue(NeedType.Curiosity);
     return this.basePriority * (1 + curiosity * 3);
+  }
+
+  supportsGoal(goalType: GoalType): boolean {
+    return goalType === GoalType.Explore;
   }
 
   execute(): void {

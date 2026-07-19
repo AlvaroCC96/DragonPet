@@ -1,3 +1,4 @@
+import { GoalType } from "../goals/GoalType";
 import type { CreatureState } from "../state/CreatureState";
 
 export interface InstinctOptions {
@@ -53,6 +54,16 @@ export abstract class Instinct {
    */
   priority(_state: CreatureState): number {
     return this.basePriority;
+  }
+
+  /**
+   * Whether this instinct is a valid way to pursue the given Goal. Defaults
+   * to supporting only Idle — override to declare support for others (e.g.
+   * ExploreNearbyInstinct supports Explore). InstinctManager only considers
+   * instincts that support the brain's current Goal when picking one.
+   */
+  supportsGoal(goalType: GoalType): boolean {
+    return goalType === GoalType.Idle;
   }
 
   /** A random duration, in seconds, within this instinct's own bounds. */

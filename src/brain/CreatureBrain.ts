@@ -1,3 +1,9 @@
+import { DragonConfig } from "../config/DragonConfig";
+import { GoalEvaluator } from "../goals/GoalEvaluator";
+import type { Goal } from "../goals/Goal";
+import type { GoalContext } from "../goals/GoalContext";
+import { dragonInteractionState } from "../interaction/DragonInteractionState";
+import { navigationState } from "../navigation/NavigationState";
 import { creatureState, type CreatureState } from "../state/CreatureState";
 import type { Instinct } from "./Instinct";
 import { InstinctManager } from "./InstinctManager";
@@ -6,27 +12,34 @@ import { defaultInstincts } from "./instincts";
 type InstinctListener = (instinct: Instinct) => void;
 
 /**
- * The creature's decision-making loop: picks an Instinct, runs it for a
- * while, then picks another. Deliberately knows nothing about Three.js or
- * the model — it only decides WHAT the creature wants to do, weighing each
- * candidate's `priority(state)` against how the creature currently feels
- * (CreatureState). It only ever reads that state, never mutates it — only
- * CreatureStateManager does that. Anything that wants to react to a
- * decision (an AnimationController) subscribes via `onInstinctChange`
- * instead of the brain reaching out to render anything.
+ * The creature's decision-making loop, now two-staged: figure out WHAT it
+ * wants (a Goal, via GoalEvaluator) before figuring out HOW (an Instinct,
+ * via InstinctManager). Deliberately knows nothing about Three.js or the
+ * model. Only ever reads CreatureState/NavigationState/DragonInteractionState
+ * to build the GoalContext — never mutates any of them. Anything that wants
+ * to react to a decision (an AnimationController) subscribes via
+ * `onInstinctChange` instead of the brain reaching out to render anything.
  */
 export class CreatureBrain {
   private readonly manager: InstinctManager;
   private readonly state: CreatureState;
+  private readonly goalEvaluator: GoalEvaluator;
   private readonly listeners = new Set<InstinctListener>();
   private currentInstinct: Instinct | null = null;
+  private currentGoal: Goal | null = null;
   private timeoutId: ReturnType<typeof setTimeout> | null = null;
   private running = false;
   private paused = false;
+  private lastInteractionAt = Date.now();
 
-  constructor(instincts: Instinct[] = defaultInstincts, state: CreatureState = creatureState) {
+  constructor(
+    instincts: Instinct[] = defaultInstincts,
+    state: CreatureState = creatureState,
+    goalEvaluator: GoalEvaluator = new GoalEvaluator(),
+  ) {
     this.manager = new InstinctManager(instincts);
     this.state = state;
+    this.goalEvaluator = goalEvaluator;
   }
 
   /** Starts the continuous think-act-wait loop. Safe to call once. */
@@ -50,6 +63,10 @@ export class CreatureBrain {
     return this.currentInstinct;
   }
 
+  getCurrentGoal(): Goal | null {
+    return this.currentGoal;
+  }
+
   /** Subscribe to instinct changes. Returns an unsubscribe function. */
   onInstinctChange(listener: InstinctListener): () => void {
     this.listeners.add(listener);
@@ -61,10 +78,13 @@ export class CreatureBrain {
    * currently running. Normal autonomous selection resumes on its own once
    * it finishes — no separate "resume" step needed. Lets external perception
    * systems (e.g. CursorAwareness) make the creature react without the brain
-   * knowing anything about them.
+   * knowing anything about them. Also counts as "an interaction" for
+   * `getSecondsSinceLastInteraction()`, since every caller of this method
+   * (ClickInteraction, HoverInteraction, DragController) represents one.
    */
   triggerInstinct(instinct: Instinct): void {
     if (!this.running) return;
+    this.lastInteractionAt = Date.now();
     if (this.timeoutId !== null) {
       clearTimeout(this.timeoutId);
       this.timeoutId = null;
@@ -91,10 +111,43 @@ export class CreatureBrain {
     }
   }
 
+  /** Seconds since the last externally-triggered interaction (click/hover/drag). */
+  getSecondsSinceLastInteraction(): number {
+    return (Date.now() - this.lastInteractionAt) / 1000;
+  }
+
   private tick(): void {
     this.timeoutId = null;
     if (!this.running || this.paused) return;
-    this.activate(this.manager.selectNext(this.currentInstinct, this.state));
+
+    const goal = this.goalEvaluator.evaluate(this.buildGoalContext());
+    const goalChanged = this.currentGoal === null || goal.type !== this.currentGoal.type;
+    this.currentGoal = goal;
+
+    const instinct = this.manager.selectNext(this.currentInstinct, goal, this.state);
+    if (goalChanged) {
+      this.logGoalChange(goal, instinct);
+    }
+
+    this.activate(instinct);
+  }
+
+  private buildGoalContext(): GoalContext {
+    return {
+      creatureState: this.state,
+      navigationState: navigationState.get(),
+      interactionState: dragonInteractionState.get(),
+      currentInstinct: this.currentInstinct,
+      secondsSinceLastInteraction: this.getSecondsSinceLastInteraction(),
+    };
+  }
+
+  private logGoalChange(goal: Goal, instinct: Instinct): void {
+    if (!DragonConfig.debugGoalLogging) return;
+    const needs = Object.fromEntries(
+      this.state.getAllNeeds().map((need) => [need.type, Math.round(need.getValue())]),
+    );
+    console.log(`[Goal] ${goal.type} -> ${instinct.id}`, needs);
   }
 
   private activate(instinct: Instinct): void {

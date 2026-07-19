@@ -1,3 +1,4 @@
+import { GoalType } from "../../goals/GoalType";
 import { Instinct } from "../Instinct";
 
 /**
@@ -6,6 +7,8 @@ import { Instinct } from "../Instinct";
  * CreatureBrain.triggerInstinct(), by CursorAwareness. `direction` is set by
  * whoever triggers it, just before triggering, to say which way to glance
  * (-1 = left, 1 = right); AnimationController and CreatureBrain never read it.
+ * Also stands in for the Observe Goal — a future dedicated "look around"
+ * instinct could join it without anything else needing to change.
  */
 export class ObserveCursorInstinct extends Instinct {
   direction = 0;
@@ -22,5 +25,9 @@ export class ObserveCursorInstinct extends Instinct {
 
   execute(): void {
     // No side effects here — the matching AnimationAction reads `direction` directly.
+  }
+
+  supportsGoal(goalType: GoalType): boolean {
+    return goalType === GoalType.Observe;
   }
 }

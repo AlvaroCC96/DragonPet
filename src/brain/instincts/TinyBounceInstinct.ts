@@ -1,3 +1,4 @@
+import { GoalType } from "../../goals/GoalType";
 import type { CreatureState } from "../../state/CreatureState";
 import { NeedType } from "../../state/NeedType";
 import { Instinct } from "../Instinct";
@@ -33,5 +34,9 @@ export class TinyBounceInstinct extends Instinct {
   priority(state: CreatureState): number {
     const playfulness = state.getNormalizedNeedValue(NeedType.Playfulness);
     return this.basePriority * (1 + playfulness * 3);
+  }
+
+  supportsGoal(goalType: GoalType): boolean {
+    return goalType === GoalType.Play;
   }
 }

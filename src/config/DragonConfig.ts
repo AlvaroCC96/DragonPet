@@ -77,4 +77,7 @@ export const DragonConfig = {
   /** Logs a table of current Need values to the console on every tick.
    * No dedicated dev panel yet — this is the simple stand-in for now. */
   debugNeedsLogging: true,
+  /** Logs the current Goal, the Instinct chosen for it, and a Need summary
+   * to the console every time the Goal changes. */
+  debugGoalLogging: true,
 } as const;
