@@ -2,6 +2,7 @@ import type { Instinct } from "../Instinct";
 import { BreatheInstinct } from "./BreatheInstinct";
 import { CelebrateInstinct } from "./CelebrateInstinct";
 import { DropSequenceInstinct } from "./DropSequenceInstinct";
+import { ExploreNearbyInstinct } from "./ExploreNearbyInstinct";
 import { HeadTiltInstinct } from "./HeadTiltInstinct";
 import { LookLeftInstinct } from "./LookLeftInstinct";
 import { LookRightInstinct } from "./LookRightInstinct";
@@ -15,6 +16,7 @@ export {
   BreatheInstinct,
   CelebrateInstinct,
   DropSequenceInstinct,
+  ExploreNearbyInstinct,
   HeadTiltInstinct,
   LookLeftInstinct,
   LookRightInstinct,
@@ -60,4 +62,5 @@ export const defaultInstincts: Instinct[] = [
   stretchInstinct,
   tinyBounceInstinct,
   dropSequenceInstinct,
+  new ExploreNearbyInstinct(),
 ];

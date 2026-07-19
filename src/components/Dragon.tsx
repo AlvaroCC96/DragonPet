@@ -11,6 +11,9 @@ import { DragController } from "../interaction/DragController";
 import { HoverInteraction } from "../interaction/HoverInteraction";
 import { InteractionManager } from "../interaction/InteractionManager";
 import { homePositionManager } from "../layout/HomePositionManager";
+import { navigationController } from "../navigation/NavigationController";
+import { creatureState } from "../state/CreatureState";
+import { CreatureStateManager } from "../state/CreatureStateManager";
 import { desktopWindowManager } from "../window/DesktopWindowManager";
 import DragonModel from "./DragonModel";
 
@@ -54,6 +57,7 @@ function Dragon() {
     const brain = new CreatureBrain();
     const controller = new AnimationController();
     controller.bindBrain(brain);
+    navigationController.bindAnimationController(controller);
 
     const tracker = new CursorTracker();
     const awareness = new CursorAwareness(tracker, brain);
@@ -64,21 +68,26 @@ function Dragon() {
 
     const drag = new DragController(brain, controller);
 
+    const stateManager = new CreatureStateManager(creatureState, brain);
+
     brain.start();
     tracker.start();
     awareness.start();
     interactions.start();
     drag.start();
+    stateManager.start();
 
     controllerRef.current = controller;
 
     return () => {
+      stateManager.stop();
       drag.stop();
       interactions.stop();
       awareness.stop();
       tracker.stop();
       brain.stop();
       controller.dispose();
+      navigationController.bindAnimationController(null);
       controllerRef.current = null;
     };
   }, []);

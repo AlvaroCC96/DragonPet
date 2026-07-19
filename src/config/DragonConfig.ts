@@ -45,6 +45,18 @@ export const DragonConfig = {
   dragTiltSensitivity: 0.015,
   maxDragTilt: 0.25,
 
+  // --- Autonomous navigation (NavigationController) ---
+  /** How fast the window travels during autonomous movement, in pixels/second. */
+  walkSpeed: 180,
+  /** How far from home (normalized, same scale as homePosition) ExploreNearbyInstinct
+   * may wander before turning back. */
+  exploreRadius: 0.15,
+  /** How long to linger at the destination before walking back home, in seconds. */
+  exploreObserveDuration: 2,
+  /** How much the dragon leans in response to travel velocity, and its cap (radians). */
+  navigationTiltSensitivity: 0.02,
+  maxNavigationTilt: 0.2,
+
   // --- Drop sequence (fall / bounce / settle / look) ---
   fallDuration: 0.2,
   fallDepth: 0.05,
@@ -60,4 +72,9 @@ export const DragonConfig = {
   idleBreathingAmplitude: 0.02,
   idleSwaySpeed: 0.55,
   idleSwayAmplitude: 0.012,
+
+  // --- CreatureState debugging ---
+  /** Logs a table of current Need values to the console on every tick.
+   * No dedicated dev panel yet — this is the simple stand-in for now. */
+  debugNeedsLogging: true,
 } as const;

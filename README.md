@@ -23,6 +23,8 @@ Built incrementally in small sprints.
 
 - **Sprint 8** — First Drag & Drop: `DragController` (`src/interaction/`) detects a press-hold-move gesture on the dragon and, while held, hands rendering of a subtle lean to `AnimationController` via a new `setOverrideAction()` — bypassing the instinct system entirely, since a drag's duration is however long the user holds it. `CreatureBrain` gained `pause()`/`resume()` so it stops picking new instincts while held without losing its place. On release, the override clears and a `DropSequenceInstinct` plays a small fall/bounce/settle/glance-at-the-user sequence through the normal `triggerInstinct()` path, then Idle resumes on its own. (Originally moved the 3D model within a large window — see Sprint 8.6.)
 - **Sprint 8.6** — Architecture pivot: instead of a large window with the model moving inside it, the *window itself* is now sized to the dragon (`DesktopWindowManager`, the only class allowed to talk to Tauri's window API) and placed at a configurable screen corner (`HomePositionManager`, now async and window-position-based instead of a 3D offset). `DragController` moves the whole OS window to follow drags (eased via `requestAnimationFrame`), not the model. Every tunable — scale, window padding, home corner, drag feel, bounce/return timing, idle breathing — now lives in `DragonConfig` (`src/config/`). Sets up cleanly for future click-through, walking, and multi-monitor support.
+- **Sprint 9** — First autonomous movement: `NavigationController` (`src/navigation/`) turns an abstract `MovementRequest` — a normalized destination, speed, easing, whether to face the travel direction — into an eased window animation via `DesktopWindowManager`, resolving via `HomePositionManager.resolveScreenPosition()`, and reports completion. `ExploreNearbyInstinct` uses it to wander to a random point near home, linger, and walk back — the brain only ever expresses *where* in normalized terms, never a window pixel. `NavigationController` is the only class allowed to move the window on its own initiative; `DragController` still moves it in direct response to the user — the two share `DesktopWindowManager` but never know about each other.
+- **Sprint 10** — The dragon's first biological system: `CreatureState` (`src/state/`) holds five `Need`s (Energy, Sleepiness, Curiosity, Playfulness, Trust) — real domain objects with bounds and drift rates, not bare numbers — and `CreatureStateManager` is the only thing that ever mutates them, ticking once a second (Curiosity rises while idle, Playfulness rises until a `Celebrate` interaction relieves it, Trust only rises on that same positive interaction). `Instinct.priority` became a method, `priority(state)`, so `ExploreNearbyInstinct` and `TinyBounceInstinct` now scale their odds with Curiosity/Playfulness — `CreatureBrain` only ever reads `CreatureState`, never mutates it. Debug visibility for now is a `console.table` of live Need values, gated by `DragonConfig.debugNeedsLogging`.
 
 ## Prerequisites
 
@@ -61,27 +63,40 @@ src/
     DragonBehaviour.tsx    Sprint 2's state machine — unused since Sprint 3, kept for reference
     ModelErrorBoundary.tsx  Visible fallback if the GLB fails to load
   config/
-    DragonConfig.ts         Every tunable "feel" parameter: scale, window padding/home corner, drag
+    DragonConfig.ts         Every tunable "feel" parameter: scale, window padding/home corner, drag/nav
                                feel, drop-sequence timing, idle breathing — no magic numbers elsewhere
   window/
     DesktopWindowManager.ts  The only class allowed to talk to @tauri-apps/api/window
   layout/
-    HomePositionManager.ts   Computes the window's default screen-corner position from DragonConfig
+    HomePositionManager.ts   resolveScreenPosition() (normalized → real position) + home-spot convenience;
+                                reused by both startup placement and NavigationController
+  navigation/
+    MovementRequest.ts        Domain object: normalized destination, speed, easing, faceDirection
+    NavigationState.ts        Idle/Moving enum + observable store + live travel lean
+    NavigationController.ts   Only class allowed to move the window on its own initiative; eases via
+                                 requestAnimationFrame, reports completion, drives WalkAction's lean
+  state/
+    NeedType.ts                Energy/Sleepiness/Curiosity/Playfulness/Trust
+    Need.ts                     Domain object: value, min, max, increaseRate, decreaseRate
+    CreatureState.ts            Read-only-ish view for Instincts; creatureState singleton
+    CreatureStateManager.ts     Only class allowed to mutate Needs; ticks every second, logs debug table
   dragon/
     behaviourStates.ts    Sprint 2's pure state/pose logic — unused since Sprint 3
   brain/
-    Instinct.ts             Abstract base: id, priority, probability, min/maxDuration, cooldown, rollIntensity()
-    InstinctManager.ts       Weighted random selection, cooldown-aware, never repeats the last instinct
-    CreatureBrain.ts         Continuous think-act-wait loop + triggerInstinct() + pause()/resume()
+    Instinct.ts              Abstract base: id, probability, min/maxDuration, cooldown, rollIntensity(),
+                                priority(state) — defaults to a constant, override to react to CreatureState
+    InstinctManager.ts        Weighted by priority(state) * probability, cooldown-aware, never repeats
+    CreatureBrain.ts          Continuous think-act-wait loop + triggerInstinct() + pause()/resume();
+                                 only ever reads CreatureState, never mutates it
     instincts/                One file per instinct (Breathe, StayStill, LookLeft, LookRight, ObserveCursor,
-                                 Celebrate, LookUp, HeadTilt, Stretch, TinyBounce, DropSequence)
+                                 Celebrate, LookUp, HeadTilt, Stretch, TinyBounce, DropSequence, ExploreNearby)
   animation/
     AnimationAction.ts       Abstract base — describes a target DragonPose, applies nothing
     AnimationController.ts   Listens to CreatureBrain, delegates all smoothing to PoseInterpolator,
                                 setOverrideAction() for brain-independent rendering (e.g. dragging)
     actions/                  One file per action (Idle, StayStill, LookLeft, LookRight, ObserveCursor,
-                                 Celebrate, LookUp, HeadTilt, Stretch, TinyBounce, Drag, DropSequence);
-                                 Drag only supplies a lean now — the window itself carries position
+                                 Celebrate, LookUp, HeadTilt, Stretch, TinyBounce, Drag, DropSequence, Walk);
+                                 Drag/Walk only supply a lean now — the window itself carries position
   pose/
     DragonPose.ts             Position/rotation/scale structure + the frozen HOME_POSE
     PoseUtils.ts               clonePose(), createHomePose() — no Three.js/GLB dependency

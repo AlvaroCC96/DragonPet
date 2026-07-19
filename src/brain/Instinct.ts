@@ -1,3 +1,5 @@
+import type { CreatureState } from "../state/CreatureState";
+
 export interface InstinctOptions {
   id: string;
   priority: number;
@@ -17,7 +19,7 @@ export interface InstinctOptions {
  */
 export abstract class Instinct {
   readonly id: string;
-  readonly priority: number;
+  protected readonly basePriority: number;
   readonly probability: number;
   readonly minDuration: number;
   readonly maxDuration: number;
@@ -25,7 +27,7 @@ export abstract class Instinct {
 
   protected constructor(options: InstinctOptions) {
     this.id = options.id;
-    this.priority = options.priority;
+    this.basePriority = options.priority;
     this.probability = options.probability;
     this.minDuration = options.minDuration;
     this.maxDuration = options.maxDuration;
@@ -42,6 +44,16 @@ export abstract class Instinct {
    * instinct's matching AnimationAction needs per-activation variation.
    */
   rollIntensity(): void {}
+
+  /**
+   * How eager the creature is to do this right now, given how it feels.
+   * Defaults to the constant priority passed to the constructor; override
+   * to react to CreatureState (e.g. explore more when curious, bounce more
+   * when playful). Only ever reads from `state` — never mutates it.
+   */
+  priority(_state: CreatureState): number {
+    return this.basePriority;
+  }
 
   /** A random duration, in seconds, within this instinct's own bounds. */
   randomDuration(): number {

@@ -1,3 +1,4 @@
+import { creatureState, type CreatureState } from "../state/CreatureState";
 import type { Instinct } from "./Instinct";
 import { InstinctManager } from "./InstinctManager";
 import { defaultInstincts } from "./instincts";
@@ -7,20 +8,25 @@ type InstinctListener = (instinct: Instinct) => void;
 /**
  * The creature's decision-making loop: picks an Instinct, runs it for a
  * while, then picks another. Deliberately knows nothing about Three.js or
- * the model — it only decides WHAT the creature wants to do. Anything that
- * wants to react to that (an AnimationController, later) subscribes via
- * `onInstinctChange` instead of the brain reaching out to render anything.
+ * the model — it only decides WHAT the creature wants to do, weighing each
+ * candidate's `priority(state)` against how the creature currently feels
+ * (CreatureState). It only ever reads that state, never mutates it — only
+ * CreatureStateManager does that. Anything that wants to react to a
+ * decision (an AnimationController) subscribes via `onInstinctChange`
+ * instead of the brain reaching out to render anything.
  */
 export class CreatureBrain {
   private readonly manager: InstinctManager;
+  private readonly state: CreatureState;
   private readonly listeners = new Set<InstinctListener>();
   private currentInstinct: Instinct | null = null;
   private timeoutId: ReturnType<typeof setTimeout> | null = null;
   private running = false;
   private paused = false;
 
-  constructor(instincts: Instinct[] = defaultInstincts) {
+  constructor(instincts: Instinct[] = defaultInstincts, state: CreatureState = creatureState) {
     this.manager = new InstinctManager(instincts);
+    this.state = state;
   }
 
   /** Starts the continuous think-act-wait loop. Safe to call once. */
@@ -88,7 +94,7 @@ export class CreatureBrain {
   private tick(): void {
     this.timeoutId = null;
     if (!this.running || this.paused) return;
-    this.activate(this.manager.selectNext(this.currentInstinct));
+    this.activate(this.manager.selectNext(this.currentInstinct, this.state));
   }
 
   private activate(instinct: Instinct): void {

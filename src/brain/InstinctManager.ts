@@ -1,8 +1,10 @@
+import type { CreatureState } from "../state/CreatureState";
 import type { Instinct } from "./Instinct";
 
 /**
  * Owns the registered instincts and picks the next one to run. Weighted by
- * priority * probability, never picks the same instinct twice in a row, and
+ * priority(state) * probability — so how the creature feels can shift the
+ * odds, not just chance — never picks the same instinct twice in a row, and
  * respects each instinct's own cooldown so the creature doesn't feel like a
  * repetitive loop. Also rolls a fresh random intensity for whichever
  * instinct it picks, if that instinct defines one.
@@ -18,7 +20,7 @@ export class InstinctManager {
     this.instincts = instincts;
   }
 
-  selectNext(previous: Instinct | null): Instinct {
+  selectNext(previous: Instinct | null, state: CreatureState): Instinct {
     const eligible = this.instincts.filter(
       (instinct) => instinct.id !== previous?.id && !this.isOnCooldown(instinct),
     );
@@ -27,7 +29,7 @@ export class InstinctManager {
     const withoutRepeat = this.instincts.filter((instinct) => instinct.id !== previous?.id);
     const pool = eligible.length > 0 ? eligible : withoutRepeat.length > 0 ? withoutRepeat : this.instincts;
 
-    const chosen = this.weightedRandomPick(pool);
+    const chosen = this.weightedRandomPick(pool, state);
     chosen.rollIntensity();
     this.lastActivatedAt.set(chosen.id, Date.now());
     return chosen;
@@ -40,8 +42,8 @@ export class InstinctManager {
     return Date.now() - lastActivated < instinct.cooldown * 1000;
   }
 
-  private weightedRandomPick(pool: Instinct[]): Instinct {
-    const weights = pool.map((instinct) => instinct.priority * instinct.probability);
+  private weightedRandomPick(pool: Instinct[], state: CreatureState): Instinct {
+    const weights = pool.map((instinct) => instinct.priority(state) * instinct.probability);
     const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
 
     if (totalWeight <= 0) {
