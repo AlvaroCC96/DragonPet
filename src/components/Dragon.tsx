@@ -3,27 +3,54 @@ import { useFrame } from "@react-three/fiber";
 import type { Group } from "three";
 import { CreatureBrain } from "../brain/CreatureBrain";
 import { AnimationController } from "../animation/AnimationController";
+import { DragonConfig } from "../config/DragonConfig";
 import { CursorTracker } from "../input/CursorTracker";
 import { CursorAwareness } from "../awareness/CursorAwareness";
 import { ClickInteraction } from "../interaction/ClickInteraction";
 import { DragController } from "../interaction/DragController";
 import { HoverInteraction } from "../interaction/HoverInteraction";
 import { InteractionManager } from "../interaction/InteractionManager";
+import { homePositionManager } from "../layout/HomePositionManager";
+import { desktopWindowManager } from "../window/DesktopWindowManager";
 import DragonModel from "./DragonModel";
+
+// StrictMode double-invokes effects in dev mode; this isn't cancellable
+// async work like the brain/tracker's start()/stop() pairs, so guard it
+// to actually run once per page load instead of racing itself.
+let windowSetupStarted = false;
+
+/** Sizes the window snugly around the dragon and moves it to its home spot. */
+async function setUpWindow(): Promise<void> {
+  if (windowSetupStarted) return;
+  windowSetupStarted = true;
+
+  const { dragonBaseSize, dragonScale, pixelsPerWorldUnit, windowPadding } = DragonConfig;
+  const contentSize = dragonBaseSize * dragonScale * pixelsPerWorldUnit;
+
+  await desktopWindowManager.resizeWindow(
+    contentSize + windowPadding.left + windowPadding.right,
+    contentSize + windowPadding.top + windowPadding.bottom,
+  );
+  await homePositionManager.restoreHomePosition();
+}
 
 /**
  * Wires the CreatureBrain's decisions to visible motion, plus the cursor
  * perception and mouse interaction loops that can nudge the brain to react.
- * Applies the Pose the controller computes each frame to this group. No
- * behavior logic lives here — that's the brain's (what to do), the actions'
- * (what pose that looks like), and the PoseInterpolator's (how smoothly to
- * get there) job.
+ * Also sizes and places the window around the dragon on mount — the window
+ * is the thing that lives on and moves around the desktop now, not the
+ * model within it. Applies the Pose the controller computes each frame to
+ * this group. No behavior logic lives here — that's the brain's (what to
+ * do), the actions' (what pose that looks like), and the PoseInterpolator's
+ * (how smoothly to get there) job.
  */
 function Dragon() {
   const rootRef = useRef<Group>(null);
   const controllerRef = useRef<AnimationController | null>(null);
 
   useEffect(() => {
+    void setUpWindow();
+
     const brain = new CreatureBrain();
     const controller = new AnimationController();
     controller.bindBrain(brain);

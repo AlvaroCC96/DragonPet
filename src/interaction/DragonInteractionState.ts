@@ -7,23 +7,23 @@ export enum DragonInteractionState {
 }
 
 export interface DragPoseSignal {
-  x: number;
-  y: number;
+  /** Radians. The position itself is now the window's job (DesktopWindowManager) —
+   * this is just the subtle lean/bank the model shows while being carried. */
   tilt: number;
 }
 
 type StateListener = (state: DragonInteractionState) => void;
 
 /**
- * Holds the current DragonInteractionState plus the live drag position while
+ * Holds the current DragonInteractionState plus the live drag tilt while
  * BeingHeld. DragController is the only writer; DragAction reads `dragPose`
- * to render the live follow, and anything that cares about state changes
+ * to render the live lean, and anything that cares about state changes
  * (e.g. pausing the brain) can subscribe via `onChange`.
  */
 export class DragonInteractionStateStore {
   private state: DragonInteractionState = DragonInteractionState.Idle;
   private readonly listeners = new Set<StateListener>();
-  readonly dragPose: DragPoseSignal = { x: 0, y: 0, tilt: 0 };
+  readonly dragPose: DragPoseSignal = { tilt: 0 };
 
   get(): DragonInteractionState {
     return this.state;

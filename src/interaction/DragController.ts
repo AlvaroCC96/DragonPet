@@ -2,18 +2,9 @@ import { dragAction } from "../animation/actions/DragAction";
 import type { AnimationController } from "../animation/AnimationController";
 import type { CreatureBrain } from "../brain/CreatureBrain";
 import { dropSequenceInstinct } from "../brain/instincts";
+import { DragonConfig } from "../config/DragonConfig";
+import { desktopWindowManager } from "../window/DesktopWindowManager";
 import { DragonInteractionState, dragonInteractionState } from "./DragonInteractionState";
-
-// Cursor must be within this many pixels of the window's center to start a drag.
-const NEAR_RADIUS_PX = 160;
-// Minimum movement, in pixels, before a press-and-hold is treated as a drag (vs. a click).
-const DRAG_THRESHOLD_PX = 6;
-// Keeps the dragon from ever reaching the literal edge of the window while dragged.
-const SOFT_LIMIT = 0.85;
-// World-space range the dragon can be dragged across.
-const DRAG_RANGE = 1.6;
-const MAX_TILT = 0.25;
-const TILT_SENSITIVITY = 4;
 
 interface ScreenPoint {
   x: number;
@@ -24,47 +15,64 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+function damp(current: number, target: number, lambda: number, deltaTime: number): number {
+  return current + (target - current) * (1 - Math.exp(-lambda * deltaTime));
+}
+
 /**
  * Detects a press-hold-move-release gesture on the dragon and turns it into
- * a live drag: while held, it writes the target position/tilt to the shared
- * DragonInteractionState and hands rendering over to AnimationController via
- * a dedicated override action, pausing CreatureBrain so it doesn't fight it
- * in the background. Never touches the model or the PoseInterpolator
- * directly — everything visual still flows through AnimationController.
+ * a live drag — of the whole OS window, not the 3D model. While held, it
+ * eases the window's position toward wherever the cursor has carried it
+ * (via DesktopWindowManager, the only class allowed to talk to Tauri) and
+ * hands the model's subtle lean/tilt to AnimationController via the
+ * existing override action. CreatureBrain is paused so it doesn't fight it
+ * in the background. Never resizes or repositions the model directly, and
+ * never reaches past DesktopWindowManager's API to touch the window itself.
  */
 export class DragController {
   private readonly brain: CreatureBrain;
   private readonly animationController: AnimationController;
 
   private pendingDragStart = false;
+  private dragStartPending = false;
   private isDragging = false;
   private dragStartScreen: ScreenPoint = { x: 0, y: 0 };
-  private lastTargetX = 0;
+  private dragStartWindow: ScreenPoint = { x: 0, y: 0 };
+  private targetWindow: ScreenPoint = { x: 0, y: 0 };
+  private currentWindow: ScreenPoint = { x: 0, y: 0 };
+  private lastCurrentX = 0;
+  private animationFrameId: number | null = null;
+  private lastFrameTime = 0;
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
-    if (this.isDragging || !this.isNearDragon(event.clientX, event.clientY)) return;
+    if (this.isDragging) return;
 
     this.pendingDragStart = true;
-    this.dragStartScreen = { x: event.clientX, y: event.clientY };
+    this.dragStartScreen = { x: event.screenX, y: event.screenY };
     (event.target as Element | null)?.setPointerCapture?.(event.pointerId);
   };
 
   private readonly handlePointerMove = (event: PointerEvent): void => {
-    if (this.pendingDragStart && !this.isDragging) {
-      const dx = event.clientX - this.dragStartScreen.x;
-      const dy = event.clientY - this.dragStartScreen.y;
-      if (Math.hypot(dx, dy) >= DRAG_THRESHOLD_PX) {
-        this.beginDrag();
+    if (this.pendingDragStart && !this.isDragging && !this.dragStartPending) {
+      const dx = event.screenX - this.dragStartScreen.x;
+      const dy = event.screenY - this.dragStartScreen.y;
+      if (Math.hypot(dx, dy) >= DragonConfig.dragThresholdPx) {
+        this.dragStartPending = true;
+        void this.beginDrag();
       }
     }
 
     if (this.isDragging) {
-      this.updateDragPose(event.clientX, event.clientY);
+      this.targetWindow = {
+        x: this.dragStartWindow.x + (event.screenX - this.dragStartScreen.x),
+        y: this.dragStartWindow.y + (event.screenY - this.dragStartScreen.y),
+      };
     }
   };
 
   private readonly handlePointerUp = (): void => {
     this.pendingDragStart = false;
+    this.dragStartPending = false;
     if (this.isDragging) {
       this.endDrag();
     }
@@ -90,45 +98,62 @@ export class DragController {
     }
   }
 
-  private beginDrag(): void {
-    this.pendingDragStart = false;
+  private async beginDrag(): Promise<void> {
+    const startWindow = await desktopWindowManager.getWindowPosition();
+
+    // The gesture may have already ended (a very quick click) while this was in flight.
+    if (!this.dragStartPending) return;
+    this.dragStartPending = false;
+
     this.isDragging = true;
-    this.lastTargetX = dragonInteractionState.dragPose.x;
+    this.dragStartWindow = startWindow;
+    this.currentWindow = { ...startWindow };
+    this.targetWindow = { ...startWindow };
+    this.lastCurrentX = startWindow.x;
 
     dragonInteractionState.set(DragonInteractionState.BeingHeld);
     this.brain.pause();
     this.animationController.setOverrideAction(dragAction);
+
+    this.lastFrameTime = performance.now();
+    this.animationFrameId = requestAnimationFrame(this.stepWindowFollow);
   }
 
   private endDrag(): void {
     this.isDragging = false;
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
 
     this.animationController.setOverrideAction(null);
+    dragonInteractionState.dragPose.tilt = 0;
     dragonInteractionState.set(DragonInteractionState.Idle);
     this.brain.resume();
     this.brain.triggerInstinct(dropSequenceInstinct);
   }
 
-  private updateDragPose(clientX: number, clientY: number): void {
-    const halfWidth = window.innerWidth / 2;
-    const halfHeight = window.innerHeight / 2;
+  private readonly stepWindowFollow = (now: number): void => {
+    if (!this.isDragging) return;
 
-    const normalizedX = clamp((clientX - halfWidth) / halfWidth, -SOFT_LIMIT, SOFT_LIMIT);
-    const normalizedY = clamp((halfHeight - clientY) / halfHeight, -SOFT_LIMIT, SOFT_LIMIT);
+    const deltaTime = Math.min((now - this.lastFrameTime) / 1000, 0.1);
+    this.lastFrameTime = now;
 
-    const targetX = normalizedX * DRAG_RANGE;
-    const targetY = normalizedY * DRAG_RANGE;
-    const tilt = clamp((targetX - this.lastTargetX) * TILT_SENSITIVITY, -MAX_TILT, MAX_TILT);
-    this.lastTargetX = targetX;
+    this.currentWindow = {
+      x: damp(this.currentWindow.x, this.targetWindow.x, DragonConfig.dragSmoothing, deltaTime),
+      y: damp(this.currentWindow.y, this.targetWindow.y, DragonConfig.dragSmoothing, deltaTime),
+    };
 
-    dragonInteractionState.dragPose.x = targetX;
-    dragonInteractionState.dragPose.y = targetY;
+    const tilt = clamp(
+      (this.currentWindow.x - this.lastCurrentX) * DragonConfig.dragTiltSensitivity,
+      -DragonConfig.maxDragTilt,
+      DragonConfig.maxDragTilt,
+    );
+    this.lastCurrentX = this.currentWindow.x;
     dragonInteractionState.dragPose.tilt = tilt;
-  }
 
-  private isNearDragon(x: number, y: number): boolean {
-    const dx = x - window.innerWidth / 2;
-    const dy = y - window.innerHeight / 2;
-    return Math.hypot(dx, dy) <= NEAR_RADIUS_PX;
-  }
+    void desktopWindowManager.moveWindow(this.currentWindow.x, this.currentWindow.y);
+
+    this.animationFrameId = requestAnimationFrame(this.stepWindowFollow);
+  };
 }

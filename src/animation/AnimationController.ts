@@ -1,5 +1,6 @@
 import type { CreatureBrain } from "../brain/CreatureBrain";
 import type { Instinct } from "../brain/Instinct";
+import { DragonConfig } from "../config/DragonConfig";
 import type { DragonPose } from "../pose/DragonPose";
 import { PoseInterpolator } from "../pose/PoseInterpolator";
 import { AnimationAction } from "./AnimationAction";
@@ -23,7 +24,7 @@ export class AnimationController {
 
   constructor(
     actions: Record<string, AnimationAction> = defaultActions,
-    interpolator: PoseInterpolator = new PoseInterpolator(),
+    interpolator: PoseInterpolator = new PoseInterpolator(DragonConfig.dragSmoothing),
   ) {
     this.actions = actions;
     this.interpolator = interpolator;

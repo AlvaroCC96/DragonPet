@@ -1,6 +1,6 @@
 # Desktop Dragon 🐉
 
-A little 3D dragon that lives on your desktop. Borderless, transparent, always-on-top window rendering a GLB model with React Three Fiber — no browser chrome, no background, just the pet.
+A little 3D dragon that lives on your desktop. Borderless, transparent, always-on-top window rendering a GLB model with React Three Fiber — no browser chrome, no background, just the pet. The window itself is sized snugly around the dragon and sits in a corner of your screen; dragging it moves the whole window, not just the model inside it.
 
 ## Stack
 
@@ -21,7 +21,8 @@ Built incrementally in small sprints.
 - **Sprint 6** — Bugfix: removed the dev-only `OrbitControls` entirely so the camera can never be moved, rotated, or zoomed by the user — the framing is now permanently fixed. Also added the first direct interactions: `InteractionManager` (`src/interaction/`) centralizes mouse events and figures out if they're near the dragon, without ever importing `CreatureBrain` itself; `ClickInteraction` (own cooldown) triggers a new `CelebrateInstinct` — a small friendly bounce — and `HoverInteraction` (own dwell-time + cooldown) reuses `ObserveCursorInstinct` when the cursor lingers nearby. No Drag & Drop yet.
 - **Sprint 7** — First personality pass: four new spontaneous instincts (`LookUp`, `HeadTilt`, `Stretch`, `TinyBounce`) that fire occasionally while idle, each built purely from the existing Pose system. `InstinctManager` gained two general capabilities to support them: a per-instinct `cooldown` (so the same quirk can't repeat too soon, on top of the existing "never twice in a row" rule) and an optional `rollIntensity()` hook, called each time an instinct is picked, that lets it randomize its own angle/height/intensity for that one occurrence — so no two glances or bounces feel identical.
 
-- **Sprint 8** — First Drag & Drop: `DragController` (`src/interaction/`) detects a press-hold-move gesture on the dragon and, while held, writes the live target position to `DragonInteractionState` (a new enum + observable store, independent of `CreatureBrain`) and hands rendering to `AnimationController` via a new `setOverrideAction()` — bypassing the instinct system entirely, since a drag's duration is however long the user holds it. `CreatureBrain` gained `pause()`/`resume()` so it stops picking new instincts while held without losing its place. On release, the override clears and a `DropSequenceInstinct` plays a small fall/bounce/settle/glance-at-the-user sequence through the normal `triggerInstinct()` path, then Idle resumes on its own. Soft position limits keep the dragon from ever leaving the window; no physics engine involved.
+- **Sprint 8** — First Drag & Drop: `DragController` (`src/interaction/`) detects a press-hold-move gesture on the dragon and, while held, hands rendering of a subtle lean to `AnimationController` via a new `setOverrideAction()` — bypassing the instinct system entirely, since a drag's duration is however long the user holds it. `CreatureBrain` gained `pause()`/`resume()` so it stops picking new instincts while held without losing its place. On release, the override clears and a `DropSequenceInstinct` plays a small fall/bounce/settle/glance-at-the-user sequence through the normal `triggerInstinct()` path, then Idle resumes on its own. (Originally moved the 3D model within a large window — see Sprint 8.6.)
+- **Sprint 8.6** — Architecture pivot: instead of a large window with the model moving inside it, the *window itself* is now sized to the dragon (`DesktopWindowManager`, the only class allowed to talk to Tauri's window API) and placed at a configurable screen corner (`HomePositionManager`, now async and window-position-based instead of a 3D offset). `DragController` moves the whole OS window to follow drags (eased via `requestAnimationFrame`), not the model. Every tunable — scale, window padding, home corner, drag feel, bounce/return timing, idle breathing — now lives in `DragonConfig` (`src/config/`). Sets up cleanly for future click-through, walking, and multi-monitor support.
 
 ## Prerequisites
 
@@ -54,10 +55,18 @@ Press **Escape** to close the window during development.
 src/
   components/
     Scene.tsx            Canvas setup: fixed camera, lights; mounts <Dragon /> (no orbit controls)
-    Dragon.tsx             Connects CreatureBrain + AnimationController + perception/interaction + DragonModel
-    DragonModel.tsx        Loads and centers the GLB
+    Dragon.tsx             Sizes/places the window on mount, connects CreatureBrain + AnimationController
+                              + perception/interaction + DragonModel
+    DragonModel.tsx        Loads and centers the GLB, applies DragonConfig's scale/rotation correction
     DragonBehaviour.tsx    Sprint 2's state machine — unused since Sprint 3, kept for reference
     ModelErrorBoundary.tsx  Visible fallback if the GLB fails to load
+  config/
+    DragonConfig.ts         Every tunable "feel" parameter: scale, window padding/home corner, drag
+                               feel, drop-sequence timing, idle breathing — no magic numbers elsewhere
+  window/
+    DesktopWindowManager.ts  The only class allowed to talk to @tauri-apps/api/window
+  layout/
+    HomePositionManager.ts   Computes the window's default screen-corner position from DragonConfig
   dragon/
     behaviourStates.ts    Sprint 2's pure state/pose logic — unused since Sprint 3
   brain/
@@ -71,7 +80,8 @@ src/
     AnimationController.ts   Listens to CreatureBrain, delegates all smoothing to PoseInterpolator,
                                 setOverrideAction() for brain-independent rendering (e.g. dragging)
     actions/                  One file per action (Idle, StayStill, LookLeft, LookRight, ObserveCursor,
-                                 Celebrate, LookUp, HeadTilt, Stretch, TinyBounce, Drag, DropSequence)
+                                 Celebrate, LookUp, HeadTilt, Stretch, TinyBounce, Drag, DropSequence);
+                                 Drag only supplies a lean now — the window itself carries position
   pose/
     DragonPose.ts             Position/rotation/scale structure + the frozen HOME_POSE
     PoseUtils.ts               clonePose(), createHomePose() — no Three.js/GLB dependency
@@ -81,16 +91,18 @@ src/
   awareness/
     CursorAwareness.ts         Polls the tracker, decides "is it close?", triggers ObserveCursorInstinct
   interaction/
-    InteractionManager.ts      Reads clicks + hover proximity; never imports CreatureBrain itself
+    InteractionManager.ts      Reads clicks + hover; never imports CreatureBrain itself — the window
+                                  is dragon-sized now, so any event it gets is inherently "on the dragon"
     ClickInteraction.ts         Own cooldown; triggers CelebrateInstinct
     HoverInteraction.ts         Own dwell-time + cooldown; triggers ObserveCursorInstinct
-    DragController.ts           Press-hold-move-release gesture; pauses the brain, drives the drag
-                                    override, triggers DropSequenceInstinct on release
-    DragonInteractionState.ts   Idle/Hover/BeingHeld enum + observable store + live drag position
+    DragController.ts           Press-hold-move-release gesture; moves the whole OS window via
+                                    DesktopWindowManager, pauses the brain, triggers DropSequenceInstinct
+    DragonInteractionState.ts   Idle/Hover/BeingHeld enum + observable store + live drag lean
 public/
   models/red-dragon.glb   The dragon asset
 src-tauri/
-  tauri.conf.json          Window config: transparent, decorations off, always-on-top
+  tauri.conf.json          Window config: transparent, decorations off, always-on-top; size/position
+                              are set at runtime by DesktopWindowManager, not fixed here
 ```
 
 ## License
