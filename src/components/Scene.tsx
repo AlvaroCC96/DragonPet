@@ -1,8 +1,7 @@
 import { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
-import DragonBehaviour from "./DragonBehaviour";
-import DragonModel from "./DragonModel";
+import Dragon from "./Dragon";
 import ModelErrorBoundary from "./ModelErrorBoundary";
 
 function Scene() {
@@ -17,9 +16,7 @@ function Scene() {
 
       <Suspense fallback={null}>
         <ModelErrorBoundary>
-          <DragonBehaviour>
-            <DragonModel />
-          </DragonBehaviour>
+          <Dragon />
         </ModelErrorBoundary>
       </Suspense>
 
